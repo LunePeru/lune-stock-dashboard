@@ -9,12 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
-import { apiClient } from '@/lib/api-client';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Product {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   totalStock: number;
   variants: ProductVariant[];
 }
@@ -49,8 +49,23 @@ const ProductsPage: React.FC = () => {
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [newProduct, setNewProduct] = useState({ name: '', description: '' });
   
-  const [sizes, setSizes] = useState<Size[]>([]);
-  const [colors, setColors] = useState<Color[]>([]);
+  const [sizes] = useState<Size[]>([
+    { id: 's1', name: 'S' },
+    { id: 's2', name: 'M' },
+    { id: 's3', name: 'L' },
+    { id: 's4', name: 'XL' },
+  ]);
+  
+  const [colors] = useState<Color[]>([
+    { id: 'c1', name: 'Negro', hex: '#000000' },
+    { id: 'c2', name: 'Blanco', hex: '#FFFFFF' },
+    { id: 'c3', name: 'Azul', hex: '#0000FF' },
+    { id: 'c4', name: 'Rojo', hex: '#FF0000' },
+    { id: 'c5', name: 'Cream', hex: '#FFFDD0' },
+    { id: 'c6', name: 'Dark Green', hex: '#006400' },
+    { id: 'c7', name: 'Brown', hex: '#A52A2A' },
+  ]);
+  
   const [newVariant, setNewVariant] = useState({ 
     productId: '', 
     size: '', 
@@ -61,48 +76,45 @@ const ProductsPage: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const data = await apiClient.get('/products');
-        setProducts(data);
+        setLoading(true);
+        
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('*');
+        
+        if (productsError) throw productsError;
+
+        const { data: variantsData, error: variantsError } = await supabase
+          .from('product_variants')
+          .select('*');
+        
+        if (variantsError) throw variantsError;
+
+        const formattedProducts = productsData.map(product => {
+          const productVariants = variantsData
+            .filter(variant => variant.product_id === product.id)
+            .map(variant => ({
+              id: variant.id,
+              size: variant.size,
+              color: variant.color,
+              stock: variant.stock
+            }));
+          
+          const totalStock = productVariants.reduce((sum, variant) => sum + variant.stock, 0);
+          
+          return {
+            id: product.id,
+            name: product.name,
+            description: product.description || 'Sin descripción',
+            totalStock,
+            variants: productVariants
+          };
+        });
+        
+        setProducts(formattedProducts);
       } catch (error) {
         console.error('Error fetching products:', error);
-        setProducts([
-          {
-            id: '1',
-            name: 'Polo Básico',
-            description: 'Polo de algodón 100%, corte regular',
-            totalStock: 45,
-            variants: [
-              { id: 'v1', size: 'S', color: 'Negro', stock: 15 },
-              { id: 'v2', size: 'M', color: 'Negro', stock: 10 },
-              { id: 'v3', size: 'L', color: 'Negro', stock: 20 },
-            ]
-          },
-          {
-            id: '2',
-            name: 'Polo Estampado',
-            description: 'Polo con estampado gráfico, algodón premium',
-            totalStock: 30,
-            variants: [
-              { id: 'v4', size: 'S', color: 'Blanco', stock: 10 },
-              { id: 'v5', size: 'M', color: 'Blanco', stock: 10 },
-              { id: 'v6', size: 'L', color: 'Blanco', stock: 10 },
-            ]
-          }
-        ]);
-        
-        setSizes([
-          { id: 's1', name: 'S' },
-          { id: 's2', name: 'M' },
-          { id: 's3', name: 'L' },
-          { id: 's4', name: 'XL' },
-        ]);
-        
-        setColors([
-          { id: 'c1', name: 'Negro', hex: '#000000' },
-          { id: 'c2', name: 'Blanco', hex: '#FFFFFF' },
-          { id: 'c3', name: 'Azul', hex: '#0000FF' },
-          { id: 'c4', name: 'Rojo', hex: '#FF0000' },
-        ]);
+        toast.error('Error al cargar los productos');
       } finally {
         setLoading(false);
       }
@@ -111,58 +123,101 @@ const ProductsPage: React.FC = () => {
     fetchProducts();
   }, []);
 
-  const handleAddProduct = () => {
-    const newProductWithId = {
-      id: `p${products.length + 1}`,
-      name: newProduct.name,
-      description: newProduct.description,
-      totalStock: 0,
-      variants: []
-    };
-    
-    setProducts([...products, newProductWithId]);
-    setNewProduct({ name: '', description: '' });
-    setIsAddDialogOpen(false);
-    toast.success('Producto agregado con éxito');
+  const handleAddProduct = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([{ name: newProduct.name, description: newProduct.description }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      const newProductWithId = {
+        id: data.id,
+        name: data.name,
+        description: data.description || 'Sin descripción',
+        totalStock: 0,
+        variants: []
+      };
+      
+      setProducts([...products, newProductWithId]);
+      setNewProduct({ name: '', description: '' });
+      setIsAddDialogOpen(false);
+      toast.success('Producto agregado con éxito');
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast.error('Error al agregar el producto');
+    }
   };
 
-  const handleEditProduct = () => {
+  const handleEditProduct = async () => {
     if (!currentProduct) return;
     
-    const updatedProducts = products.map(product => 
-      product.id === currentProduct.id ? currentProduct : product
-    );
-    
-    setProducts(updatedProducts);
-    setIsEditDialogOpen(false);
-    toast.success('Producto actualizado con éxito');
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ name: currentProduct.name, description: currentProduct.description })
+        .eq('id', currentProduct.id);
+      
+      if (error) throw error;
+      
+      const updatedProducts = products.map(product => 
+        product.id === currentProduct.id ? currentProduct : product
+      );
+      
+      setProducts(updatedProducts);
+      setIsEditDialogOpen(false);
+      toast.success('Producto actualizado con éxito');
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast.error('Error al actualizar el producto');
+    }
   };
 
-  const handleAddVariant = () => {
+  const handleAddVariant = async () => {
     if (!currentProduct) return;
     
-    const newVariantWithId = {
-      id: `v${new Date().getTime()}`,
-      size: newVariant.size,
-      color: newVariant.color,
-      stock: newVariant.stock
-    };
-    
-    const updatedProduct = {
-      ...currentProduct,
-      variants: [...currentProduct.variants, newVariantWithId],
-      totalStock: currentProduct.totalStock + newVariant.stock
-    };
-    
-    const updatedProducts = products.map(product => 
-      product.id === currentProduct.id ? updatedProduct : product
-    );
-    
-    setProducts(updatedProducts);
-    setCurrentProduct(updatedProduct);
-    setNewVariant({ productId: '', size: '', color: '', stock: 0 });
-    setIsVariantDialogOpen(false);
-    toast.success('Variante agregada con éxito');
+    try {
+      const { data, error } = await supabase
+        .from('product_variants')
+        .insert([{
+          product_id: currentProduct.id,
+          size: newVariant.size,
+          color: newVariant.color,
+          stock: newVariant.stock
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      const newVariantWithId = {
+        id: data.id,
+        size: data.size,
+        color: data.color,
+        stock: data.stock
+      };
+      
+      const updatedProduct = {
+        ...currentProduct,
+        variants: [...currentProduct.variants, newVariantWithId],
+        totalStock: currentProduct.totalStock + newVariant.stock
+      };
+      
+      const updatedProducts = products.map(product => 
+        product.id === currentProduct.id ? updatedProduct : product
+      );
+      
+      setProducts(updatedProducts);
+      setCurrentProduct(updatedProduct);
+      setNewVariant({ productId: '', size: '', color: '', stock: 0 });
+      setIsVariantDialogOpen(false);
+      toast.success('Variante agregada con éxito');
+    } catch (error) {
+      console.error('Error adding variant:', error);
+      toast.error('Error al agregar la variante');
+    }
   };
 
   const filteredProducts = products.filter(product => 

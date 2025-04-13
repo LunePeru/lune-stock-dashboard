@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,10 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/components/ui/sonner';
-import { apiClient } from '@/lib/api-client';
 import { Plus, Search, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Product {
   id: string;
@@ -52,68 +53,91 @@ const SalesPage: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [filteredVariants, setFilteredVariants] = useState<ProductVariant[]>([]);
 
+  // Create a sales table if it doesn't exist
+  const checkAndCreateSalesTable = async () => {
+    try {
+      const { data: salesTableExists } = await supabase
+        .from('sales')
+        .select('*')
+        .limit(1);
+      
+      if (salesTableExists === null) {
+        console.log('Sales table might not exist. Consider running SQL migration to create it.');
+      }
+    } catch (error) {
+      console.error('Error checking sales table:', error);
+    }
+  };
+
   useEffect(() => {
+    checkAndCreateSalesTable();
+    
     const fetchData = async () => {
       try {
-        // These would be your actual API endpoints
-        const productsData = await apiClient.get('/products');
-        const salesData = await apiClient.get('/sales');
+        setLoading(true);
         
-        setProducts(productsData);
-        setSales(salesData);
+        // Fetch products from Supabase
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('*');
+        
+        if (productsError) throw productsError;
+
+        // Fetch variants
+        const { data: variantsData, error: variantsError } = await supabase
+          .from('product_variants')
+          .select('*');
+        
+        if (variantsError) throw variantsError;
+        
+        // Fetch sales if the table exists
+        let salesData: any[] = [];
+        try {
+          const { data, error } = await supabase
+            .from('sales')
+            .select('*')
+            .order('date', { ascending: false });
+          
+          if (data) salesData = data;
+          if (error && error.code !== 'PGRST116') throw error; // PGRST116: Table not found
+        } catch (salesError) {
+          console.log('Sales table may not exist yet:', salesError);
+        }
+
+        // Organize products data
+        const formattedProducts = productsData.map(product => {
+          const productVariants = variantsData
+            .filter(variant => variant.product_id === product.id)
+            .map(variant => ({
+              id: variant.id,
+              size: variant.size,
+              color: variant.color,
+              stock: variant.stock
+            }));
+          
+          return {
+            id: product.id,
+            name: product.name,
+            variants: productVariants
+          };
+        });
+        
+        // Format sales data if available
+        const formattedSales = salesData.map(sale => ({
+          id: sale.id,
+          productName: sale.product_name,
+          size: sale.size,
+          color: sale.color,
+          quantity: sale.quantity,
+          date: sale.date,
+          total: sale.total
+        }));
+        
+        setProducts(formattedProducts);
+        setSales(formattedSales);
       } catch (error) {
         console.error('Error fetching data:', error);
-        // Mock data for demo
-        setProducts([
-          {
-            id: '1',
-            name: 'Polo Básico',
-            variants: [
-              { id: 'v1', size: 'S', color: 'Negro', stock: 15 },
-              { id: 'v2', size: 'M', color: 'Negro', stock: 10 },
-              { id: 'v3', size: 'L', color: 'Negro', stock: 20 },
-            ]
-          },
-          {
-            id: '2',
-            name: 'Polo Estampado',
-            variants: [
-              { id: 'v4', size: 'S', color: 'Blanco', stock: 10 },
-              { id: 'v5', size: 'M', color: 'Blanco', stock: 10 },
-              { id: 'v6', size: 'L', color: 'Blanco', stock: 10 },
-            ]
-          }
-        ]);
-        
-        setSales([
-          {
-            id: 's1',
-            productName: 'Polo Básico',
-            size: 'M',
-            color: 'Negro',
-            quantity: 2,
-            date: '2023-04-10T15:30:00',
-            total: 79.8
-          },
-          {
-            id: 's2',
-            productName: 'Polo Estampado',
-            size: 'L',
-            color: 'Blanco',
-            quantity: 1,
-            date: '2023-04-09T11:45:00',
-            total: 39.9
-          },
-          {
-            id: 's3',
-            productName: 'Polo Básico',
-            size: 'S',
-            color: 'Negro',
-            quantity: 3,
-            date: '2023-04-08T14:20:00',
-            total: 119.7
-          }
-        ]);
+        toast.error('Error al cargar los datos');
       } finally {
         setLoading(false);
       }
@@ -134,7 +158,7 @@ const SalesPage: React.FC = () => {
     }
   }, [newSale.productId, products]);
 
-  const handleAddSale = () => {
+  const handleAddSale = async () => {
     if (!selectedProduct || !newSale.variantId) return;
     
     const variant = filteredVariants.find(v => v.id === newSale.variantId);
@@ -145,45 +169,91 @@ const SalesPage: React.FC = () => {
       return;
     }
     
-    // In a real app, this would make an API call to register the sale
-    const total = newSale.price * newSale.quantity;
-    
-    const newSaleRecord = {
-      id: `s${sales.length + 1}`,
-      productName: selectedProduct.name,
-      size: variant.size,
-      color: variant.color,
-      quantity: newSale.quantity,
-      date: new Date().toISOString(),
-      total
-    };
-    
-    setSales([newSaleRecord, ...sales]);
-    
-    // Update stock
-    const updatedProducts = products.map(product => {
-      if (product.id === selectedProduct.id) {
-        const updatedVariants = product.variants.map(v => {
-          if (v.id === variant.id) {
-            return { ...v, stock: v.stock - newSale.quantity };
-          }
-          return v;
-        });
-        return { ...product, variants: updatedVariants };
+    try {
+      const total = newSale.price * newSale.quantity;
+      const now = new Date().toISOString();
+      
+      // First, create the sales table if it doesn't exist yet
+      try {
+        await supabase.rpc('create_sales_table_if_not_exists');
+      } catch (error) {
+        console.log('Sales table might already exist or RPC not available.');
       }
-      return product;
-    });
-    
-    setProducts(updatedProducts);
-    setIsNewSaleDialogOpen(false);
-    setNewSale({
-      productId: '',
-      variantId: '',
-      quantity: 1,
-      price: 39.9
-    });
-    
-    toast.success('Venta registrada con éxito');
+      
+      // Insert the sale into Supabase
+      const { data: saleData, error: saleError } = await supabase
+        .from('sales')
+        .insert([{
+          product_name: selectedProduct.name,
+          product_id: selectedProduct.id,
+          variant_id: variant.id,
+          size: variant.size,
+          color: variant.color,
+          quantity: newSale.quantity,
+          price: newSale.price,
+          total: total,
+          date: now
+        }])
+        .select()
+        .single();
+      
+      if (saleError) {
+        if (saleError.code === 'PGRST116') { // Table not found
+          toast.error('La tabla de ventas no existe. Por favor, crea la tabla primero.');
+          return;
+        }
+        throw saleError;
+      }
+      
+      // Update the variant stock in Supabase
+      const { error: updateError } = await supabase
+        .from('product_variants')
+        .update({ stock: variant.stock - newSale.quantity })
+        .eq('id', variant.id);
+      
+      if (updateError) throw updateError;
+      
+      // Update local state
+      const newSaleRecord = {
+        id: saleData.id,
+        productName: selectedProduct.name,
+        size: variant.size,
+        color: variant.color,
+        quantity: newSale.quantity,
+        date: now,
+        total
+      };
+      
+      setSales([newSaleRecord, ...sales]);
+      
+      // Update product stock in local state
+      const updatedProducts = products.map(product => {
+        if (product.id === selectedProduct.id) {
+          const updatedVariants = product.variants.map(v => {
+            if (v.id === variant.id) {
+              return { ...v, stock: v.stock - newSale.quantity };
+            }
+            return v;
+          });
+          return { ...product, variants: updatedVariants };
+        }
+        return product;
+      });
+      
+      setProducts(updatedProducts);
+      setIsNewSaleDialogOpen(false);
+      setNewSale({
+        productId: '',
+        variantId: '',
+        quantity: 1,
+        price: 39.9
+      });
+      
+      toast.success('Venta registrada con éxito');
+    } catch (error) {
+      console.error('Error registering sale:', error);
+      toast.error('Error al registrar la venta');
+    }
   };
 
   const filteredSales = sales.filter(sale => 

@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { apiClient } from '@/lib/api-client';
 import { ShoppingBag, Package, DollarSign, TrendingUp } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { format, subDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 interface DashboardStats {
   totalProducts: number;
@@ -15,6 +16,27 @@ interface DashboardStats {
 interface SalesData {
   date: string;
   value: number;
+}
+
+interface ProductVariant {
+  id: string;
+  product_id: string;
+  size: string;
+  color: string;
+  stock: number;
+}
+
+interface Sale {
+  id: string;
+  product_id: string;
+  product_name: string;
+  variant_id: string;
+  size: string;
+  color: string;
+  quantity: number;
+  price: number;
+  total: number;
+  date: string;
 }
 
 const DashboardPage: React.FC = () => {
@@ -31,31 +53,107 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // These would be actual API endpoints in your Spring Boot backend
-        const statsData = await apiClient.get('/dashboard/stats');
-        const salesChartData = await apiClient.get('/dashboard/sales-chart');
+        setIsLoading(true);
         
-        setStats(statsData);
-        setSalesData(salesChartData);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        // For demo purposes, set mock data
+        // Fetch products data
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('*');
+        
+        if (productsError) throw productsError;
+        
+        // Fetch variants data
+        const { data: variants, error: variantsError } = await supabase
+          .from('product_variants')
+          .select('*');
+        
+        if (variantsError) throw variantsError;
+        
+        // Get sales data if table exists
+        let sales: Sale[] = [];
+        try {
+          const { data: salesData, error: salesError } = await supabase
+            .from('sales')
+            .select('*');
+          
+          if (!salesError && salesData) {
+            sales = salesData;
+          }
+        } catch (error) {
+          console.log('Sales table may not exist yet:', error);
+        }
+        
+        // Calculate dashboard stats
+        const totalProducts = products.length;
+        const totalStock = variants.reduce((sum, variant) => sum + variant.stock, 0);
+        
+        // Count recent sales (last 7 days)
+        const sevenDaysAgo = subDays(new Date(), 7);
+        const recentSales = sales.filter(sale => 
+          new Date(sale.date) >= sevenDaysAgo
+        ).length;
+        
+        // Count low stock items (less than 5 in stock)
+        const lowStockItems = variants.filter(variant => variant.stock < 5).length;
+        
+        // Prepare weekly sales chart data
+        const weekDays = Array.from({ length: 7 }, (_, i) => {
+          const date = subDays(new Date(), i);
+          return {
+            date: format(date, 'E'), // 'E' gives abbreviated weekday name
+            fullDate: date,
+            value: 0
+          };
+        }).reverse();
+        
+        // Count sales for each day
+        if (sales.length > 0) {
+          sales.forEach(sale => {
+            const saleDate = new Date(sale.date);
+            
+            weekDays.forEach(day => {
+              // Check if the sale date falls within this day
+              if (isWithinInterval(saleDate, {
+                start: startOfDay(day.fullDate),
+                end: endOfDay(day.fullDate)
+              })) {
+                day.value += 1;
+              }
+            });
+          });
+        }
+        
+        // Format the data for the chart
+        const formattedSalesData = weekDays.map(({ date, value }) => ({ date, value }));
+        
         setStats({
-          totalProducts: 24,
-          totalStock: 487,
-          recentSales: 28,
-          lowStockItems: 5
+          totalProducts,
+          totalStock,
+          recentSales,
+          lowStockItems
         });
         
-        setSalesData([
-          { date: 'Lun', value: 12 },
-          { date: 'Mar', value: 19 },
-          { date: 'Mie', value: 15 },
-          { date: 'Jue', value: 22 },
-          { date: 'Vie', value: 30 },
-          { date: 'Sab', value: 18 },
-          { date: 'Dom', value: 10 },
-        ]);
+        setSalesData(formattedSalesData);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        // Fallback to empty data
+        setStats({
+          totalProducts: 0,
+          totalStock: 0,
+          recentSales: 0,
+          lowStockItems: 0
+        });
+        
+        // Generate empty week data
+        const emptyWeekData = Array.from({ length: 7 }, (_, i) => {
+          const date = subDays(new Date(), 6 - i);
+          return {
+            date: format(date, 'E'),
+            value: 0
+          };
+        });
+        
+        setSalesData(emptyWeekData);
       } finally {
         setIsLoading(false);
       }
