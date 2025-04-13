@@ -1,20 +1,17 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-}
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  signup: (email: string, password: string, username: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -23,66 +20,93 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        const token = localStorage.getItem('lunestock_token');
-        
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
-        
-        // Fetch user profile with the token
-        const userData = await apiClient.get('/auth/me');
-        setUser(userData);
-      } catch (error) {
-        // If token is invalid, clear it
-        localStorage.removeItem('lunestock_token');
-      } finally {
-        setIsLoading(false);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
       }
-    };
-    
-    checkAuthStatus();
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.post('/auth/login', { email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
-      if (response.token) {
-        localStorage.setItem('lunestock_token', response.token);
-        
-        // Fetch user data
-        const userData = await apiClient.get('/auth/me');
-        setUser(userData);
-        
-        toast.success('Inicio de sesión exitoso');
+      if (error) {
+        throw error;
       }
-    } catch (error) {
-      toast.error('Credenciales inválidas');
+      
+      toast.success('Inicio de sesión exitoso');
+    } catch (error: any) {
+      toast.error(error.message || 'Credenciales inválidas');
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('lunestock_token');
-    setUser(null);
-    toast.success('Sesión cerrada exitosamente');
+  const signup = async (email: string, password: string, username: string) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+          },
+        },
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success('Cuenta creada exitosamente. Verifica tu correo electrónico.');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear la cuenta');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      toast.success('Sesión cerrada exitosamente');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al cerrar sesión');
+    }
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
+      session,
       isAuthenticated: !!user, 
       isLoading, 
       login, 
+      signup,
       logout 
     }}>
       {children}
