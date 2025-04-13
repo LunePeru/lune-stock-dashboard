@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,9 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { apiClient } from '@/lib/api-client';
+import { supabase } from '@/integrations/supabase/client';
 import { Search, PackageOpen, AlertTriangle, Edit, Plus, Minus } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface ProductVariant {
   id: string;
@@ -20,8 +22,6 @@ interface ProductVariant {
 }
 
 const InventoryPage: React.FC = () => {
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [productFilter, setProductFilter] = useState('_all');
   const [sizeFilter, setSizeFilter] = useState('_all');
@@ -36,64 +36,89 @@ const InventoryPage: React.FC = () => {
   const [uniqueSizes, setUniqueSizes] = useState<string[]>([]);
   const [uniqueColors, setUniqueColors] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        // This would be your actual API endpoint
-        const data = await apiClient.get('/inventory');
-        setVariants(data);
-      } catch (error) {
-        console.error('Error fetching inventory:', error);
-        // Mock data for demo
-        const mockVariants = [
-          { id: 'v1', productName: 'Polo Básico', size: 'S', color: 'Negro', stock: 15 },
-          { id: 'v2', productName: 'Polo Básico', size: 'M', color: 'Negro', stock: 10 },
-          { id: 'v3', productName: 'Polo Básico', size: 'L', color: 'Negro', stock: 20 },
-          { id: 'v4', productName: 'Polo Estampado', size: 'S', color: 'Blanco', stock: 10 },
-          { id: 'v5', productName: 'Polo Estampado', size: 'M', color: 'Blanco', stock: 10 },
-          { id: 'v6', productName: 'Polo Estampado', size: 'L', color: 'Blanco', stock: 10 },
-          { id: 'v7', productName: 'Polo Rayas', size: 'S', color: 'Azul', stock: 8 },
-          { id: 'v8', productName: 'Polo Rayas', size: 'M', color: 'Azul', stock: 12 },
-          { id: 'v9', productName: 'Polo Rayas', size: 'L', color: 'Azul', stock: 5 },
-          { id: 'v10', productName: 'Polo Sport', size: 'M', color: 'Rojo', stock: 7 },
-          { id: 'v11', productName: 'Polo Sport', size: 'L', color: 'Rojo', stock: 3 },
-        ];
-        
-        setVariants(mockVariants);
-        
-        // Extract unique values for filters
-        const products = [...new Set(mockVariants.map(v => v.productName))];
-        const sizes = [...new Set(mockVariants.map(v => v.size))];
-        const colors = [...new Set(mockVariants.map(v => v.color))];
-        
-        setUniqueProducts(products);
-        setUniqueSizes(sizes);
-        setUniqueColors(colors);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const queryClient = useQueryClient();
 
-    fetchInventory();
-  }, []);
+  // Fetch inventory data from Supabase
+  const fetchInventory = async () => {
+    const { data, error } = await supabase
+      .from('product_variants')
+      .select(`
+        id,
+        size,
+        color,
+        stock,
+        products (
+          name
+        )
+      `);
+    
+    if (error) {
+      throw new Error(error.message);
+    }
+    
+    // Transform the data to match our ProductVariant interface
+    const variants: ProductVariant[] = data.map(item => ({
+      id: item.id,
+      productName: item.products.name,
+      size: item.size,
+      color: item.color,
+      stock: item.stock
+    }));
+    
+    return variants;
+  };
+  
+  // Use React Query to fetch and cache the data
+  const { data: variants = [], isLoading } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: fetchInventory
+  });
+
+  // Mutation for updating stock
+  const updateStockMutation = useMutation({
+    mutationFn: async ({ variantId, newStock }: { variantId: string, newStock: number }) => {
+      const { error } = await supabase
+        .from('product_variants')
+        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .eq('id', variantId);
+      
+      if (error) throw new Error(error.message);
+      return { variantId, newStock };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      setIsAdjustStockDialogOpen(false);
+      toast.success(`Stock ${stockOperation === 'add' ? 'aumentado' : 'reducido'} con éxito`);
+    },
+    onError: (error) => {
+      toast.error(`Error al ajustar stock: ${error.message}`);
+    }
+  });
+
+  // Extract unique values for filters
+  useEffect(() => {
+    if (variants.length > 0) {
+      const products = [...new Set(variants.map(v => v.productName))];
+      const sizes = [...new Set(variants.map(v => v.size))];
+      const colors = [...new Set(variants.map(v => v.color))];
+      
+      setUniqueProducts(products);
+      setUniqueSizes(sizes);
+      setUniqueColors(colors);
+    }
+  }, [variants]);
 
   const handleAdjustStock = () => {
     if (!currentVariant) return;
     
-    // In a real app, this would make an API call to adjust the stock
     const newStock = stockOperation === 'add' 
       ? currentVariant.stock + stockAdjustment
       : Math.max(0, currentVariant.stock - stockAdjustment);
     
-    const updatedVariants = variants.map(variant => 
-      variant.id === currentVariant.id 
-        ? { ...variant, stock: newStock } 
-        : variant
-    );
-    
-    setVariants(updatedVariants);
-    setIsAdjustStockDialogOpen(false);
-    toast.success(`Stock ${stockOperation === 'add' ? 'aumentado' : 'reducido'} con éxito`);
+    updateStockMutation.mutate({ 
+      variantId: currentVariant.id, 
+      newStock 
+    });
   };
 
   const filteredVariants = variants.filter(variant => {
@@ -116,7 +141,7 @@ const InventoryPage: React.FC = () => {
     };
   });
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-luneblue"></div>
@@ -346,10 +371,10 @@ const InventoryPage: React.FC = () => {
             </Button>
             <Button 
               onClick={handleAdjustStock}
-              disabled={stockAdjustment <= 0}
+              disabled={stockAdjustment <= 0 || updateStockMutation.isPending}
               className={stockOperation === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'}
             >
-              {stockOperation === 'add' ? 'Aumentar' : 'Reducir'} Stock
+              {updateStockMutation.isPending ? 'Procesando...' : stockOperation === 'add' ? 'Aumentar' : 'Reducir'} Stock
             </Button>
           </DialogFooter>
         </DialogContent>
