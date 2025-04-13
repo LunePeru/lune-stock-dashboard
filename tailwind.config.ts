@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,16 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				luneblue: {
+					DEFAULT: '#3b82f6',
+					dark: '#1d4ed8',
+					light: '#60a5fa'
+				},
+				lunegray: {
+					DEFAULT: '#f3f4f6',
+					dark: '#9ca3af',
+					light: '#f9fafb'
 				}
 			},
 			borderRadius: {
