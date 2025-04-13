@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,9 +23,9 @@ const InventoryPage: React.FC = () => {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [productFilter, setProductFilter] = useState('');
-  const [sizeFilter, setSizeFilter] = useState('');
-  const [colorFilter, setColorFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('_all');
+  const [sizeFilter, setSizeFilter] = useState('_all');
+  const [colorFilter, setColorFilter] = useState('_all');
   
   const [isAdjustStockDialogOpen, setIsAdjustStockDialogOpen] = useState(false);
   const [currentVariant, setCurrentVariant] = useState<ProductVariant | null>(null);
@@ -99,9 +98,9 @@ const InventoryPage: React.FC = () => {
 
   const filteredVariants = variants.filter(variant => {
     const matchesSearch = variant.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesProduct = productFilter ? variant.productName === productFilter : true;
-    const matchesSize = sizeFilter ? variant.size === sizeFilter : true;
-    const matchesColor = colorFilter ? variant.color === colorFilter : true;
+    const matchesProduct = productFilter === '_all' ? true : variant.productName === productFilter;
+    const matchesSize = sizeFilter === '_all' ? true : variant.size === sizeFilter;
+    const matchesColor = colorFilter === '_all' ? true : variant.color === colorFilter;
     
     return matchesSearch && matchesProduct && matchesSize && matchesColor;
   });
@@ -171,7 +170,7 @@ const InventoryPage: React.FC = () => {
             <SelectValue placeholder="Producto" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos los productos</SelectItem>
+            <SelectItem value="_all">Todos los productos</SelectItem>
             {uniqueProducts.map((product) => (
               <SelectItem key={product} value={product}>
                 {product}
@@ -186,7 +185,7 @@ const InventoryPage: React.FC = () => {
               <SelectValue placeholder="Talla" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas las tallas</SelectItem>
+              <SelectItem value="_all">Todas las tallas</SelectItem>
               {uniqueSizes.map((size) => (
                 <SelectItem key={size} value={size}>
                   {size}
@@ -200,7 +199,7 @@ const InventoryPage: React.FC = () => {
               <SelectValue placeholder="Color" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los colores</SelectItem>
+              <SelectItem value="_all">Todos los colores</SelectItem>
               {uniqueColors.map((color) => (
                 <SelectItem key={color} value={color}>
                   {color}

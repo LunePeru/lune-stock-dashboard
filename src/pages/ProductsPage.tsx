@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,12 +61,10 @@ const ProductsPage: React.FC = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // This would be your actual API endpoint
         const data = await apiClient.get('/products');
         setProducts(data);
       } catch (error) {
         console.error('Error fetching products:', error);
-        // Mock data for demo
         setProducts([
           {
             id: '1',
@@ -115,7 +112,6 @@ const ProductsPage: React.FC = () => {
   }, []);
 
   const handleAddProduct = () => {
-    // In a real app, this would make an API call to create the product
     const newProductWithId = {
       id: `p${products.length + 1}`,
       name: newProduct.name,
@@ -133,7 +129,6 @@ const ProductsPage: React.FC = () => {
   const handleEditProduct = () => {
     if (!currentProduct) return;
     
-    // In a real app, this would make an API call to update the product
     const updatedProducts = products.map(product => 
       product.id === currentProduct.id ? currentProduct : product
     );
@@ -146,7 +141,6 @@ const ProductsPage: React.FC = () => {
   const handleAddVariant = () => {
     if (!currentProduct) return;
     
-    // In a real app, this would make an API call to add the variant
     const newVariantWithId = {
       id: `v${new Date().getTime()}`,
       size: newVariant.size,
@@ -281,7 +275,6 @@ const ProductsPage: React.FC = () => {
         </CardContent>
       </Card>
       
-      {/* Add Product Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -322,7 +315,6 @@ const ProductsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Edit Product Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -362,7 +354,6 @@ const ProductsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Add Variant Dialog */}
       <Dialog open={isVariantDialogOpen} onOpenChange={setIsVariantDialogOpen}>
         <DialogContent>
           <DialogHeader>

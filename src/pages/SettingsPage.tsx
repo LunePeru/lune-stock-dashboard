@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +39,6 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // These would be your actual API endpoints
         const sizesData = await apiClient.get('/settings/sizes');
         const colorsData = await apiClient.get('/settings/colors');
         
@@ -48,7 +46,6 @@ const SettingsPage: React.FC = () => {
         setColors(colorsData);
       } catch (error) {
         console.error('Error fetching settings:', error);
-        // Mock data for demo
         setSizes([
           { id: 's1', name: 'S' },
           { id: 's2', name: 'M' },
@@ -73,7 +70,6 @@ const SettingsPage: React.FC = () => {
   const handleAddSize = () => {
     if (!newSize.trim()) return;
     
-    // In a real app, this would make an API call to add the size
     const newSizeItem = {
       id: `s${sizes.length + 1}`,
       name: newSize.trim()
@@ -88,7 +84,6 @@ const SettingsPage: React.FC = () => {
   const handleEditSize = () => {
     if (!currentSize || !currentSize.name.trim()) return;
     
-    // In a real app, this would make an API call to update the size
     const updatedSizes = sizes.map(size => 
       size.id === currentSize.id ? currentSize : size
     );
@@ -99,7 +94,6 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteSize = (id: string) => {
-    // In a real app, this would make an API call to delete the size
     const updatedSizes = sizes.filter(size => size.id !== id);
     setSizes(updatedSizes);
     toast.success('Talla eliminada con éxito');
@@ -108,7 +102,6 @@ const SettingsPage: React.FC = () => {
   const handleAddColor = () => {
     if (!newColor.name.trim() || !newColor.hex.trim()) return;
     
-    // In a real app, this would make an API call to add the color
     const newColorItem = {
       id: `c${colors.length + 1}`,
       name: newColor.name.trim(),
@@ -124,7 +117,6 @@ const SettingsPage: React.FC = () => {
   const handleEditColor = () => {
     if (!currentColor || !currentColor.name.trim() || !currentColor.hex.trim()) return;
     
-    // In a real app, this would make an API call to update the color
     const updatedColors = colors.map(color => 
       color.id === currentColor.id ? currentColor : color
     );
@@ -135,7 +127,6 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteColor = (id: string) => {
-    // In a real app, this would make an API call to delete the color
     const updatedColors = colors.filter(color => color.id !== id);
     setColors(updatedColors);
     toast.success('Color eliminado con éxito');
@@ -300,7 +291,6 @@ const SettingsPage: React.FC = () => {
         </TabsContent>
       </Tabs>
       
-      {/* Add Size Dialog */}
       <Dialog open={isAddSizeDialogOpen} onOpenChange={setIsAddSizeDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -331,7 +321,6 @@ const SettingsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Edit Size Dialog */}
       <Dialog open={isEditSizeDialogOpen} onOpenChange={setIsEditSizeDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -363,7 +352,6 @@ const SettingsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Add Color Dialog */}
       <Dialog open={isAddColorDialogOpen} onOpenChange={setIsAddColorDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -422,7 +410,6 @@ const SettingsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Edit Color Dialog */}
       <Dialog open={isEditColorDialogOpen} onOpenChange={setIsEditColorDialogOpen}>
         <DialogContent>
           <DialogHeader>
