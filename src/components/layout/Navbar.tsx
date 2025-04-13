@@ -19,7 +19,7 @@ const Navbar: React.FC = () => {
           <div className="hidden md:flex items-center space-x-1">
             <User className="h-4 w-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-600">
-              {user?.username || 'Admin'}
+              {user?.user_metadata?.username || 'Admin'}
             </span>
           </div>
           
