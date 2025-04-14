@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      colors: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          hex: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       product_variants: {
         Row: {
           color: string
@@ -145,6 +166,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sizes: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
     }
     Views: {

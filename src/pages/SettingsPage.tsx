@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { apiClient } from '@/lib/api-client';
+import { supabase } from '@/integrations/supabase/client';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
@@ -39,26 +39,24 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const sizesData = await apiClient.get('/settings/sizes');
-        const colorsData = await apiClient.get('/settings/colors');
-        
-        setSizes(sizesData);
-        setColors(colorsData);
+        const { data: sizesData, error: sizesError } = await supabase
+          .from('sizes')
+          .select('*')
+          .order('created_at');
+
+        const { data: colorsData, error: colorsError } = await supabase
+          .from('colors')
+          .select('*')
+          .order('created_at');
+
+        if (sizesError) throw sizesError;
+        if (colorsError) throw colorsError;
+
+        setSizes(sizesData || []);
+        setColors(colorsData || []);
       } catch (error) {
         console.error('Error fetching settings:', error);
-        setSizes([
-          { id: 's1', name: 'S' },
-          { id: 's2', name: 'M' },
-          { id: 's3', name: 'L' },
-          { id: 's4', name: 'XL' },
-        ]);
-        
-        setColors([
-          { id: 'c1', name: 'Negro', hex: '#000000' },
-          { id: 'c2', name: 'Blanco', hex: '#FFFFFF' },
-          { id: 'c3', name: 'Azul', hex: '#0000FF' },
-          { id: 'c4', name: 'Rojo', hex: '#FF0000' },
-        ]);
+        toast.error('No se pudieron cargar las configuraciones');
       } finally {
         setLoading(false);
       }
@@ -67,69 +65,146 @@ const SettingsPage: React.FC = () => {
     fetchSettings();
   }, []);
 
-  const handleAddSize = () => {
+  const handleAddSize = async () => {
     if (!newSize.trim()) return;
     
-    const newSizeItem = {
-      id: `s${sizes.length + 1}`,
-      name: newSize.trim()
-    };
-    
-    setSizes([...sizes, newSizeItem]);
-    setNewSize('');
-    setIsAddSizeDialogOpen(false);
-    toast.success('Talla agregada con éxito');
+    try {
+      const { data, error } = await supabase
+        .from('sizes')
+        .insert({ name: newSize.trim() })
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        setSizes([...sizes, data[0]]);
+        setNewSize('');
+        setIsAddSizeDialogOpen(false);
+        toast.success('Talla agregada con éxito');
+      }
+    } catch (error) {
+      console.error('Error adding size:', error);
+      toast.error('No se pudo agregar la talla');
+    }
   };
 
-  const handleEditSize = () => {
+  const handleEditSize = async () => {
     if (!currentSize || !currentSize.name.trim()) return;
     
-    const updatedSizes = sizes.map(size => 
-      size.id === currentSize.id ? currentSize : size
-    );
-    
-    setSizes(updatedSizes);
-    setIsEditSizeDialogOpen(false);
-    toast.success('Talla actualizada con éxito');
+    try {
+      const { data, error } = await supabase
+        .from('sizes')
+        .update({ name: currentSize.name })
+        .eq('id', currentSize.id)
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        const updatedSizes = sizes.map(size => 
+          size.id === currentSize.id ? data[0] : size
+        );
+        
+        setSizes(updatedSizes);
+        setIsEditSizeDialogOpen(false);
+        toast.success('Talla actualizada con éxito');
+      }
+    } catch (error) {
+      console.error('Error editing size:', error);
+      toast.error('No se pudo actualizar la talla');
+    }
   };
 
-  const handleDeleteSize = (id: string) => {
-    const updatedSizes = sizes.filter(size => size.id !== id);
-    setSizes(updatedSizes);
-    toast.success('Talla eliminada con éxito');
+  const handleDeleteSize = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('sizes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const updatedSizes = sizes.filter(size => size.id !== id);
+      setSizes(updatedSizes);
+      toast.success('Talla eliminada con éxito');
+    } catch (error) {
+      console.error('Error deleting size:', error);
+      toast.error('No se pudo eliminar la talla');
+    }
   };
 
-  const handleAddColor = () => {
+  const handleAddColor = async () => {
     if (!newColor.name.trim() || !newColor.hex.trim()) return;
     
-    const newColorItem = {
-      id: `c${colors.length + 1}`,
-      name: newColor.name.trim(),
-      hex: newColor.hex.trim()
-    };
-    
-    setColors([...colors, newColorItem]);
-    setNewColor({ name: '', hex: '#000000' });
-    setIsAddColorDialogOpen(false);
-    toast.success('Color agregado con éxito');
+    try {
+      const { data, error } = await supabase
+        .from('colors')
+        .insert({
+          name: newColor.name.trim(),
+          hex: newColor.hex.trim()
+        })
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        setColors([...colors, data[0]]);
+        setNewColor({ name: '', hex: '#000000' });
+        setIsAddColorDialogOpen(false);
+        toast.success('Color agregado con éxito');
+      }
+    } catch (error) {
+      console.error('Error adding color:', error);
+      toast.error('No se pudo agregar el color');
+    }
   };
 
-  const handleEditColor = () => {
+  const handleEditColor = async () => {
     if (!currentColor || !currentColor.name.trim() || !currentColor.hex.trim()) return;
     
-    const updatedColors = colors.map(color => 
-      color.id === currentColor.id ? currentColor : color
-    );
-    
-    setColors(updatedColors);
-    setIsEditColorDialogOpen(false);
-    toast.success('Color actualizado con éxito');
+    try {
+      const { data, error } = await supabase
+        .from('colors')
+        .update({
+          name: currentColor.name,
+          hex: currentColor.hex
+        })
+        .eq('id', currentColor.id)
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        const updatedColors = colors.map(color => 
+          color.id === currentColor.id ? data[0] : color
+        );
+        
+        setColors(updatedColors);
+        setIsEditColorDialogOpen(false);
+        toast.success('Color actualizado con éxito');
+      }
+    } catch (error) {
+      console.error('Error editing color:', error);
+      toast.error('No se pudo actualizar el color');
+    }
   };
 
-  const handleDeleteColor = (id: string) => {
-    const updatedColors = colors.filter(color => color.id !== id);
-    setColors(updatedColors);
-    toast.success('Color eliminado con éxito');
+  const handleDeleteColor = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('colors')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const updatedColors = colors.filter(color => color.id !== id);
+      setColors(updatedColors);
+      toast.success('Color eliminado con éxito');
+    } catch (error) {
+      console.error('Error deleting color:', error);
+      toast.error('No se pudo eliminar el color');
+    }
   };
 
   if (loading) {
