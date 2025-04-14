@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -7,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 interface DashboardStats {
-  totalProducts: number;
+  totalRevenue: number;
   totalStock: number;
   recentSales: number;
   lowStockItems: number;
@@ -41,7 +40,7 @@ interface Sale {
 
 const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
-    totalProducts: 0,
+    totalRevenue: 0,
     totalStock: 0,
     recentSales: 0,
     lowStockItems: 0
@@ -83,8 +82,8 @@ const DashboardPage: React.FC = () => {
           console.log('Sales table may not exist yet:', error);
         }
         
-        // Calculate dashboard stats
-        const totalProducts = products.length;
+        // Calculate total revenue from all sales
+        const totalRevenue = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
         const totalStock = variants.reduce((sum, variant) => sum + variant.stock, 0);
         
         // Count recent sales (last 7 days)
@@ -127,7 +126,7 @@ const DashboardPage: React.FC = () => {
         const formattedSalesData = weekDays.map(({ date, value }) => ({ date, value }));
         
         setStats({
-          totalProducts,
+          totalRevenue,
           totalStock,
           recentSales,
           lowStockItems
@@ -138,7 +137,7 @@ const DashboardPage: React.FC = () => {
         console.error('Error fetching dashboard data:', error);
         // Fallback to empty data
         setStats({
-          totalProducts: 0,
+          totalRevenue: 0,
           totalStock: 0,
           recentSales: 0,
           lowStockItems: 0
@@ -182,11 +181,11 @@ const DashboardPage: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Productos</p>
-                <h3 className="text-2xl font-bold mt-1">{stats.totalProducts}</h3>
+                <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                <h3 className="text-2xl font-bold mt-1">${stats.totalRevenue.toFixed(2)}</h3>
               </div>
-              <div className="bg-luneblue-light bg-opacity-20 p-3 rounded-full">
-                <ShoppingBag className="h-5 w-5 text-luneblue" />
+              <div className="bg-green-100 p-3 rounded-full">
+                <DollarSign className="h-5 w-5 text-green-600" />
               </div>
             </div>
           </CardContent>

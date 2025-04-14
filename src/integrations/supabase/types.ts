@@ -50,16 +50,19 @@ export type Database = {
       products: {
         Row: {
           created_at: string
+          description: string | null
           id: string
           name: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
           name: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
           name?: string
         }
@@ -89,12 +92,69 @@ export type Database = {
         }
         Relationships: []
       }
+      sales: {
+        Row: {
+          color: string
+          date: string
+          id: string
+          price: number
+          product_id: string
+          product_name: string
+          quantity: number
+          size: string
+          total: number
+          variant_id: string
+        }
+        Insert: {
+          color: string
+          date?: string
+          id?: string
+          price: number
+          product_id: string
+          product_name: string
+          quantity: number
+          size: string
+          total: number
+          variant_id: string
+        }
+        Update: {
+          color?: string
+          date?: string
+          id?: string
+          price?: number
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          size?: string
+          total?: number
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_sales_table_if_not_exists: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
