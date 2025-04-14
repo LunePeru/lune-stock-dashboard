@@ -222,75 +222,11 @@ const SettingsPage: React.FC = () => {
         <p className="text-gray-500">Administra tallas, colores y otros ajustes del sistema</p>
       </div>
       
-      <Tabs defaultValue="sizes" className="w-full">
+      <Tabs defaultValue="colors" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="sizes">Tallas</TabsTrigger>
           <TabsTrigger value="colors">Colores</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="sizes">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>Tallas Disponibles</CardTitle>
-              <Button 
-                onClick={() => {
-                  setNewSize('');
-                  setIsAddSizeDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Talla
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Talla</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sizes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center py-8 text-gray-500">
-                        No hay tallas configuradas
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sizes.map((size) => (
-                      <TableRow key={size.id}>
-                        <TableCell className="font-medium">{size.name}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setCurrentSize(size);
-                                setIsEditSizeDialogOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="text-red-500 border-red-200 hover:bg-red-50"
-                              onClick={() => handleDeleteSize(size.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
         
         <TabsContent value="colors">
           <Card>
@@ -351,6 +287,70 @@ const SettingsPage: React.FC = () => {
                               size="sm"
                               className="text-red-500 border-red-200 hover:bg-red-50"
                               onClick={() => handleDeleteColor(color.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="sizes">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle>Tallas Disponibles</CardTitle>
+              <Button 
+                onClick={() => {
+                  setNewSize('');
+                  setIsAddSizeDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Talla
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Talla</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sizes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={2} className="text-center py-8 text-gray-500">
+                        No hay tallas configuradas
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sizes.map((size) => (
+                      <TableRow key={size.id}>
+                        <TableCell className="font-medium">{size.name}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setCurrentSize(size);
+                                setIsEditSizeDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="text-red-500 border-red-200 hover:bg-red-50"
+                              onClick={() => handleDeleteSize(size.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
