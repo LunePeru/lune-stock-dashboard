@@ -66,7 +66,6 @@ const SalesPage: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
-  // Create a sales table if it doesn't exist
   const checkAndCreateSalesTable = async () => {
     try {
       const { data: salesTableExists } = await supabase
@@ -89,21 +88,18 @@ const SalesPage: React.FC = () => {
       try {
         setLoading(true);
         
-        // Fetch products from Supabase
         const { data: productsData, error: productsError } = await supabase
           .from('products')
           .select('*');
         
         if (productsError) throw productsError;
 
-        // Fetch variants
         const { data: variantsData, error: variantsError } = await supabase
           .from('product_variants')
           .select('*');
         
         if (variantsError) throw variantsError;
         
-        // Fetch sales if the table exists
         let salesData: any[] = [];
         try {
           const { data, error } = await supabase
@@ -112,12 +108,11 @@ const SalesPage: React.FC = () => {
             .order('date', { ascending: false });
           
           if (data) salesData = data;
-          if (error && error.code !== 'PGRST116') throw error; // PGRST116: Table not found
+          if (error && error.code !== 'PGRST116') throw error;
         } catch (salesError) {
           console.log('Sales table may not exist yet:', salesError);
         }
 
-        // Organize products data
         const formattedProducts = productsData.map(product => {
           const productVariants = variantsData
             .filter(variant => variant.product_id === product.id)
@@ -135,7 +130,6 @@ const SalesPage: React.FC = () => {
           };
         });
         
-        // Format sales data if available
         const formattedSales = salesData.map(sale => ({
           id: sale.id,
           productName: sale.product_name,
@@ -164,7 +158,7 @@ const SalesPage: React.FC = () => {
       const product = products.find(p => p.id === newSale.productId) || null;
       setSelectedProduct(product);
       setFilteredVariants(product?.variants || []);
-      setNewSale({ ...newSale, variantId: '' }); // Reset variant selection when product changes
+      setNewSale({ ...newSale, variantId: '' });
     } else {
       setSelectedProduct(null);
       setFilteredVariants([]);
@@ -186,14 +180,12 @@ const SalesPage: React.FC = () => {
       const total = newSale.price * newSale.quantity;
       const now = new Date().toISOString();
       
-      // First, create the sales table if it doesn't exist yet
       try {
         await supabase.rpc('create_sales_table_if_not_exists');
       } catch (error) {
         console.log('Sales table might already exist or RPC not available.');
       }
       
-      // Insert the sale into Supabase
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert([{
@@ -211,14 +203,13 @@ const SalesPage: React.FC = () => {
         .single();
       
       if (saleError) {
-        if (saleError.code === 'PGRST116') { // Table not found
+        if (saleError.code === 'PGRST116') {
           toast.error('La tabla de ventas no existe. Por favor, crea la tabla primero.');
           return;
         }
         throw saleError;
       }
       
-      // Update the variant stock in Supabase
       const { error: updateError } = await supabase
         .from('product_variants')
         .update({ stock: variant.stock - newSale.quantity })
@@ -226,7 +217,6 @@ const SalesPage: React.FC = () => {
       
       if (updateError) throw updateError;
       
-      // Update local state
       const newSaleRecord = {
         id: saleData.id,
         productName: selectedProduct.name,
@@ -239,7 +229,6 @@ const SalesPage: React.FC = () => {
       
       setSales([newSaleRecord, ...sales]);
       
-      // Update product stock in local state
       const updatedProducts = products.map(product => {
         if (product.id === selectedProduct.id) {
           const updatedVariants = product.variants.map(v => {
@@ -309,7 +298,6 @@ const SalesPage: React.FC = () => {
 
       if (error) throw error;
 
-      // Update local state
       const updatedSales = sales.map(sale => 
         sale.id === selectedSale.id 
           ? {
@@ -464,7 +452,6 @@ const SalesPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Edit Sale Dialog */}
       <Dialog open={isEditSaleDialogOpen} onOpenChange={setIsEditSaleDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -555,7 +542,6 @@ const SalesPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -576,7 +562,6 @@ const SalesPage: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Register Sale Dialog */}
       <Dialog open={isNewSaleDialogOpen} onOpenChange={setIsNewSaleDialogOpen}>
         <DialogContent>
           <DialogHeader>
